@@ -19,7 +19,8 @@ CILP_PARAM = 0.2
 
 class Trainer:
 
-    def __init__(self, state_dim, action_dim, action_lim, ram):
+    def __init__(self, state_dim, action_dim, action_lim, states=None, actions=None, rewards=None):
+#    def __init__(self, state_dim, action_dim, action_lim):
         """
         :param state_dim: Dimensions of state (int)
         :param action_dim: Dimension of action (int)
@@ -30,7 +31,6 @@ class Trainer:
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.action_lim = action_lim
-        self.ram = ram
         self.iter = 0
         self.noise = utils.OrnsteinUhlenbeckActionNoise(self.action_dim)
 
@@ -43,6 +43,10 @@ class Trainer:
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(),LEARNING_RATE)
 
         self.steps = 0
+	
+	self.states = states
+	self.actions = actions 
+	self.rewards = rewards
 
         utils.hard_update(self.target_actor, self.actor)
         utils.hard_update(self.target_critic, self.critic)
@@ -73,11 +77,13 @@ class Trainer:
         Samples a random batch from replay memory and performs optimization
         :return:
         """
-        s1,a1,r1,s2 = self.ram.sample(BATCH_SIZE)
 
-        states = Variable(torch.from_numpy(s1))
-        actions = Variable(torch.from_numpy(a1))
-        discounted_rewards = Variable(torch.from_numpy(r1))
+        states = Variable(torch.from_numpy(self.states))
+#	print states
+        actions = Variable(torch.from_numpy(self.actions))
+#	print actions
+        discounted_rewards = Variable(torch.from_numpy(self.rewards))
+#	print discounted_rewards
         #s2 = Variable(torch.from_numpy(s2))
 
         # ---------------------- optimize critic ----------------------

@@ -29,33 +29,27 @@ def run():
     A_DIM = env.action_space.shape[0]
     A_MAX = env.action_space.high[0]
 
-
-    steps = 0
-    episodes = 0
-    episode_done = False
-
-
-
-
     print ' State Dimensions :- ', S_DIM
     print ' Action Dimensions :- ', A_DIM
     print ' Action Max :- ', A_MAX
 
-    ram = buffer.MemoryBuffer(MAX_BUFFER)
-    trainer = train.Trainer(S_DIM, A_DIM, A_MAX, ram)
+    #trainer = train.Trainer(S_DIM, A_DIM, A_MAX, states, actions, rewards)
+    trainer = train.Trainer(S_DIM, A_DIM, A_MAX)
+    
 
-    while episodes < MAX_EPISODES:
-        states, actions, rewards = run_n_steps(env, trainer)
-        print 'states are ', states, '\n'
-        print 'actions are ', actions, '\n'
-        print 'rewards are ', rewards, '\n'
+    for episodes in range(MAX_EPISODES):
+	state = env.reset()		
+	state = np.float32(state)
+	states, actions, rewards = [], [], []
+
+        states, actions, rewards = run_n_steps(env, trainer, state, states, actions, rewards)
+	trainer.states = np.asarray(states)
+	trainer.actions = np.asarray(actions)
+	trainer.rewards = np.asarray(rewards)
         trainer.optimize()
 
 
-def run_n_steps(env, trainer):
-    for epsidode in range(MAX_EPISODES):
-        state = env.reset()
-        states, actions, rewards = [], [], []
+def run_n_steps(env, trainer, state, states, actions, rewards):
         episode_reward = 0
         for t in range(EPISODE_LENGTH): # in one episode
             env.render()
@@ -63,17 +57,18 @@ def run_n_steps(env, trainer):
             next_state, reward, done, info = env.step(action)
             states.append(state)
             actions.append(action)
-            rewards.append(reward)
+            rewards.append(np.float32(reward))
 
             state = next_state
+	    state = np.float32(state)
             episode_reward += reward
 
             # calculate discounted rewards, and return them back to ppo agent as numpy array
             if(t+1) % ROLL_OUT_STEPS ==0 or t == EPISODE_LENGTH -1:
-                final_action = action
-                final_state = trainer.get_exploitation_action(final_action)
-                action_var = Variable(torch.from_numpy(final_action))
-                state_var = Variable(torch.from_numpy(final_state))
+                final_state = state
+                final_action = trainer.get_exploitation_action(final_state)
+                action_var = Variable(torch.from_numpy(final_action)).unsqueeze(0)
+                state_var = Variable(torch.from_numpy(final_state)).unsqueeze(0)
                 # use pytorch calculate forward pass, then back to numpy array
                 value_var = trainer.critic.forward(state_var, action_var).detach()
                 final_value = value_var.data.numpy()[0]
@@ -95,66 +90,5 @@ def discount_reward(rewards, final_value):
 
 if __name__ == "__main__":
 	run()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
