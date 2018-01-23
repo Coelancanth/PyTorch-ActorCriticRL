@@ -45,75 +45,11 @@ def run():
     trainer = train.Trainer(S_DIM, A_DIM, A_MAX, ram)
 
     while episodes < MAX_EPISODES:
-        _run_n_steps(env,steps,MAX_STEPS, ROLL_OUT_STEPS, ram, trainer, episodes, episode_done)
+        states, actions, rewards = run_n_steps(env,steps,MAX_STEPS, ROLL_OUT_STEPS, ram, trainer, episodes, episode_done)
+        print 'states are ', states, '\n'
+        print 'actions are ', actions, '\n'
+        print 'rewards are ', rewards, '\n'
         trainer.optimize()
-
-
-
-
-# Each iteration, each of N actors collect T timesteps of data
-def _run_n_steps(env, steps, max_steps, roll_out_steps, ram, trainer, episodes, episode_done ):
-
-    observation = env.reset()
-
-    if(steps >= max_steps):
-        state = env.reset()
-        steps = 0
-    states = []
-    actions = []
-    rewards = []
-
-    # take n (roll out) steps, store them as np_value into buffer
-
-    for i in range(roll_out_steps):
-        env.render()
-        state = np.float32(observation)
-        states.append(state)
-
-        action = trainer.get_exploitation_action(state)
-        actions.append(action)
-
-        next_observation, reward, done, info = env.step(action)
-        rewards.append(reward)
-
-        next_state = np.float32(next_observation)
-        if done:
-            state = env.reset()
-            break
-
-    # bound case, calculate final value
-    if done:
-        final_value = 0.0
-        episodes += 1
-        episode_done = True
-    else:
-        episode_done = False
-        final_action = trainer.get_exploitation_action(next_state)
-
-        # use pytorch calculate value function, then back to numpy
-        # but is this value function Q function???
-
-        action_var = Variable(torch.from_numpy(final_action))
-        state_var = Variable(torch.from_numpy(next_state, final_action))
-
-
-        value_var = trainer.critic.forward(state_var, action_var).detach()
-
-        final_value = value_var.data.numpy()[0]
-    discounted_rewards = discount_reward(rewards, final_value)
-    steps += 1
-    #
-    ram.add(states, actions, discounted_rewards)
-
-
-# different time, different rewards
-def discount_reward(rewards, final_value):
-    discounted_r = np.zeros_like(rewards)
-    running_add = final_value
-    for t in reversed(range(0, len(rewards))):
-        running_add = running_add * REWARD_GAMMA + rewards[t]
-        discounted_r[t] = running_add
-    return discounted_r
 
 
 def run_n_steps(env, trainer):
@@ -143,6 +79,18 @@ def run_n_steps(env, trainer):
                 final_value = value_var.data.numpy()[0]
                 discount_rewards = discount_reward(rewards, final_value)
                 return states, actions, discount_rewards
+
+
+
+
+# different time, different rewards
+def discount_reward(rewards, final_value):
+    discounted_r = np.zeros_like(rewards)
+    running_add = final_value
+    for t in reversed(range(0, len(rewards))):
+        running_add = running_add * REWARD_GAMMA + rewards[t]
+        discounted_r[t] = running_add
+    return discounted_r
 
 
 
