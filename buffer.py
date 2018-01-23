@@ -30,7 +30,7 @@ class MemoryBuffer:
 	def len(self):
 		return self.len
 
-	def add(self, s, a, r, s1):
+	def add(self, s, a, r, s1=None):
 		"""
 		adds a particular transaction in the memory buffer
 		:param s: current state
