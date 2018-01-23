@@ -77,15 +77,18 @@ class Trainer:
 
         states = Variable(torch.from_numpy(s1))
         actions = Variable(torch.from_numpy(a1))
-        rewards = Variable(torch.from_numpy(r1))
+        discounted_rewards = Variable(torch.from_numpy(r1))
         #s2 = Variable(torch.from_numpy(s2))
 
         # ---------------------- optimize critic ----------------------
 
         self.critic_optimizer.zero_grad()
-        target_values = rewards
+        #target_values = rewards
         values = torch.squeeze(self.critic.forward(states, actions))
-        critic_loss = nn.MSELoss()(values, target_values)
+        advantages = discounted_rewards - values
+
+        critic_loss = torch.mean(torch.square(advantages))
+        #critic_loss = nn.MSELoss()(values, target_values)
         critic_loss.backward()
         self.critic_optimizer.step()
 
@@ -112,15 +115,22 @@ class Trainer:
 
         # optimize actor network
         self.actor_optimizer.zero_grad()
-        values = torch.squeeze(self.target_critic.forward(states, actions).detach())
-        advantages = rewards - values
+        values = torch.squeeze(self.target_critic.forward(states, actions))
 
-        action_log_probs = self.actor.forward(states).detach()
-        action_log_probs = torch.sum(action_log_probs * actions, 1)
-        old_action_log_probs = self.target_actor(states).detach()
-        old_action_log_probs = torch.sum(old_action_log_probs * actions, 1)
-        ratio = torch.exp(action_log_probs - old_action_log_probs)
+        # TODO, use Generalized Advantage Estimator
+
+        # action_log_probs = self.actor.forward(states)
+        # action_log_probs = torch.sum(action_log_probs * actions, 1)
+        # old_action_log_probs = self.target_actor(states)
+        # old_action_log_probs = torch.sum(old_action_log_probs * actions, 1)
+        # use exp since log, ratio = pi_new / pi_old
+        action_probs = self.actor.forward(states)
+        old_action_probs = self.target_actor.forward(states)
+        ratio = action_probs/ old_action_probs
+
+        # ratio = torch.exp(action_log_probs - old_action_log_probs)
         surr1 = ratio * advantages
+        # from paper, clamp works the best
         surr2 = torch.clamp(ratio, 1.0 - CILP_PARAM, 1.0 + CILP_PARAM) * advantages
         actor_loss = -torch.mean(torch.min(surr1, surr2))
         actor_loss.backward()

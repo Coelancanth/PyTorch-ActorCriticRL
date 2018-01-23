@@ -13,6 +13,7 @@ import buffer
 MAX_EPISODES = 5000
 MAX_STEPS = 1000
 MAX_BUFFER = 1000000
+EPISODE_LENGTH = 200
 
 MAX_TOTAL_REWARD = 300
 
@@ -48,52 +49,6 @@ def run():
         trainer.optimize()
 
 
-
-
-    # for _ep in range(MAX_EPISODES):
-    #     observation = env.reset()
-    #     print 'EPISODE :- ', _ep
-    #     for r in range(MAX_STEPS):
-    #         env.render()
-    #         state = np.float32(observation)
-    #
-    #         action = trainer.get_exploration_action(state)
-    #         # if _ep%5 == 0:
-    #         # 	# validate every 5th episode
-    #         # 	action = trainer.get_exploitation_action(state)
-    #         # else:
-    #         # 	# get action based on observation, use exploration policy here
-    #         # 	action = trainer.get_exploration_action(state)
-    #
-    #         new_observation, reward, done, info = env.step(action)
-    #         # # dont update if this is validation
-    #         # if _ep%50 == 0 or _ep>450:
-    #         # 	continue
-    #
-    #         if done:
-    #             new_state = None
-    #         else:
-    #             new_state = np.float32(new_observation)
-    #             # push this exp in ram
-    #             ram.add(state, action, reward, new_state)
-    #
-    #         observation = new_observation
-    #
-    #         # perform optimization
-    #         trainer.optimize()
-    #         if done:
-    #             break
-    #
-    #     # check memory consumption and clear memory
-    #     gc.collect()
-    #     # process = psutil.Process(os.getpid())
-    #     # print(process.memory_info().rss)
-    #
-    #     if _ep%100 == 0:
-    #         trainer.save_models(_ep)
-    #
-    #
-    # #print 'Completed episodes'
 
 
 # Each iteration, each of N actors collect T timesteps of data
@@ -145,12 +100,13 @@ def _run_n_steps(env, steps, max_steps, roll_out_steps, ram, trainer, episodes, 
         value_var = trainer.critic.forward(state_var, action_var).detach()
 
         final_value = value_var.data.numpy()[0]
-    rewards = discount_reward(rewards, final_value)
+    discounted_rewards = discount_reward(rewards, final_value)
     steps += 1
-    ram.add(states, actions, rewards)
+    #
+    ram.add(states, actions, discounted_rewards)
 
 
-
+# different time, different rewards
 def discount_reward(rewards, final_value):
     discounted_r = np.zeros_like(rewards)
     running_add = final_value
@@ -158,6 +114,35 @@ def discount_reward(rewards, final_value):
         running_add = running_add * REWARD_GAMMA + rewards[t]
         discounted_r[t] = running_add
     return discounted_r
+
+
+def run_n_steps(env, trainer):
+    for epsidode in range(MAX_EPISODES):
+        state = env.reset()
+        states, actions, rewards = [], [], []
+        episode_reward = 0
+        for t in range(EPISODE_LENGTH): # in one episode
+            env.render()
+            action = trainer.get_exploitation_action(state)
+            next_state, reward, done, info = env.step(action)
+            states.append(state)
+            actions.append(action)
+            rewards.append(reward)
+
+            state = next_state
+            episode_reward += reward
+
+            # calculate discounted rewards, and return them back to ppo agent as numpy array
+            if(t+1) % ROLL_OUT_STEPS ==0 or t == EPISODE_LENGTH -1:
+                final_action = action
+                final_state = trainer.get_exploitation_action(final_action)
+                action_var = Variable(torch.from_numpy(final_action))
+                state_var = Variable(torch.from_numpy(final_state))
+                # use pytorch calculate forward pass, then back to numpy array
+                value_var = trainer.critic.forward(state_var, action_var).detach()
+                final_value = value_var.data.numpy()[0]
+                discount_rewards = discount_reward(rewards, final_value)
+                return states, actions, discount_rewards
 
 
 
