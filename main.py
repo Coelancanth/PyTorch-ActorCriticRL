@@ -45,7 +45,7 @@ def run():
     trainer = train.Trainer(S_DIM, A_DIM, A_MAX, ram)
 
     while episodes < MAX_EPISODES:
-        states, actions, rewards = run_n_steps(env,steps,MAX_STEPS, ROLL_OUT_STEPS, ram, trainer, episodes, episode_done)
+        states, actions, rewards = run_n_steps(env, trainer)
         print 'states are ', states, '\n'
         print 'actions are ', actions, '\n'
         print 'rewards are ', rewards, '\n'
@@ -93,6 +93,8 @@ def discount_reward(rewards, final_value):
     return discounted_r
 
 
+if __name__ == "__main__":
+	run()
 
 
 
